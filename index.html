@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Amortization + Extra Payments</title>
+  <title>Amortization + Extra Payments (with Taxes & Insurance)</title>
   <style>
     :root{
       --bg:#0b1220; --panel:#0f1a2e; --panel2:#0c1628;
@@ -36,9 +36,7 @@
     }
     .wrap{max-width:1180px; margin:0 auto; padding:16px;}
     .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center; justify-content:space-between;}
-    .title{
-      display:flex; gap:12px; align-items:center;
-    }
+    .title{display:flex; gap:12px; align-items:center;}
     .badge{
       font-family:var(--mono);
       font-size:12px; padding:6px 10px; border-radius:999px;
@@ -123,9 +121,7 @@
       background: color-mix(in oklab, var(--panel) 88%, transparent);
       margin-top:12px;
     }
-    .bar{
-      display:flex; height:16px; width:100%;
-    }
+    .bar{display:flex; height:16px; width:100%;}
     .bar > div{height:100%}
     .legend{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:12px}
     .dot{width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px; vertical-align:middle}
@@ -159,7 +155,7 @@
       <div class="row">
         <div class="title">
           <h1>Mortgage Amortization + Extra Payments</h1>
-          <span class="badge" id="versionBadge">Single-file calculator</span>
+          <span class="badge" id="versionBadge">+ Taxes & Insurance</span>
         </div>
         <div class="toggle" id="themeToggle" role="button" aria-label="Toggle theme">
           <small>Theme</small>
@@ -167,9 +163,26 @@
         </div>
       </div>
     </div>
-  </header>
+</header>
 
-  <main class="wrap">
+<div class="wrap">
+  <div style="
+    margin-top:12px;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid var(--warn);
+    background:color-mix(in oklab, var(--warn) 12%, var(--panel));
+    font-size:13px;
+    line-height:1.4;
+  ">
+    ⚠ Educational estimate only. This calculator is not a loan quote or approval.
+    Rates, taxes, insurance, and escrow can change. Buyers should contact a licensed
+    mortgage lender for official numbers and underwriting.
+  </div>
+</div>
+
+<main class="wrap">
+
     <div class="grid">
       <!-- Inputs -->
       <section class="card">
@@ -191,6 +204,15 @@
             <div>
               <label>Term (years)</label>
               <input id="years" type="number" min="1" step="1" value="30">
+            </div>
+
+            <div>
+              <label>Property taxes (yearly)</label>
+              <input id="taxesYearly" type="number" min="0" step="50" value="0">
+            </div>
+            <div>
+              <label>Homeowners insurance (yearly)</label>
+              <input id="insYearly" type="number" min="0" step="50" value="0">
             </div>
 
             <div>
@@ -222,8 +244,7 @@
           </div>
 
           <div class="hint">
-            Tip: Keep “Loan amount” at the actual financed amount. If you only know purchase price,
-            set loan amount = purchase price for a clean demo.
+            Taxes/insurance are shown as monthly equivalents for “all-in” payment, but they do not affect principal payoff.
           </div>
         </div>
       </section>
@@ -234,12 +255,17 @@
         <div class="content">
           <div class="kpis">
             <div class="kpi">
-              <div class="label">Monthly payment (P&I)</div>
+              <div class="label">Monthly payment (P&amp;I)</div>
               <div class="value" id="monthlyPI">$—</div>
-              <div class="sub" id="monthlyPIHint">Excludes taxes/insurance</div>
+              <div class="sub" id="monthlyPIHint">Principal + Interest only</div>
             </div>
             <div class="kpi">
-              <div class="label">Payoff time</div>
+              <div class="label">All-in monthly (PITI-ish)</div>
+              <div class="value" id="monthlyAllIn">$—</div>
+              <div class="sub" id="monthlyAllInHint">P&amp;I + taxes + insurance (+ extra)</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Payoff time (loan)</div>
               <div class="value" id="payoffTime">—</div>
               <div class="sub" id="payoffDate">—</div>
             </div>
@@ -247,6 +273,11 @@
               <div class="label">Total interest</div>
               <div class="value" id="totalInterest">$—</div>
               <div class="sub">Across this scenario</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Total taxes + insurance (to payoff)</div>
+              <div class="value" id="totalTI">$—</div>
+              <div class="sub" id="tiMonthly">—</div>
             </div>
             <div class="kpi">
               <div class="label">Interest saved vs. standard</div>
@@ -267,7 +298,7 @@
           </div>
 
           <div class="footer-note" id="note">
-            This schedule assumes a fixed rate and that extra payments go directly to principal.
+            Taxes/insurance are estimates and can change year-to-year. This view keeps them flat for clarity.
           </div>
         </div>
       </section>
@@ -278,7 +309,7 @@
         <div class="content">
           <div class="smallrow">
             <div class="hint" style="margin:0">
-              Showing full schedule (scroll). Columns: payment, principal, interest, extra, ending balance.
+              Table shows loan amortization only (P&amp;I). “All-in” includes taxes/insurance in the summary above.
             </div>
             <div class="hint" style="margin:0; font-family:var(--mono)" id="rowCount">—</div>
           </div>
@@ -306,7 +337,6 @@
   </main>
 
 <script>
-  // ---------- helpers ----------
   const $ = (id) => document.getElementById(id);
 
   function fmtMoney(n){
@@ -323,7 +353,6 @@
     const d = new Date(date);
     const day = d.getDate();
     d.setMonth(d.getMonth() + months);
-    // handle month-end rollovers
     if (d.getDate() < day) d.setDate(0);
     return d;
   }
@@ -332,14 +361,12 @@
     return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
   }
 
-  // Payment formula: P = L * r / (1 - (1+r)^-n)
   function monthlyPayment(loan, annualRate, months){
     const r = (annualRate/100)/12;
     if (r === 0) return loan / months;
     return loan * (r / (1 - Math.pow(1+r, -months)));
   }
 
-  // Build schedule with optional extra monthly and one-time extra
   function buildSchedule({loan, annualRate, years, extraMonthly, oneTimeExtra, oneTimeMonth, startDate}){
     const n = Math.round(years * 12);
     const r = (annualRate/100)/12;
@@ -349,8 +376,6 @@
     let totalInterest = 0;
     let rows = [];
     let m = 1;
-
-    // cap loop to prevent infinite in weird edge cases
     const maxMonths = 1200;
 
     while (bal > 0.01 && m <= maxMonths){
@@ -361,15 +386,12 @@
       let extra = extraMonthly || 0;
       if (oneTimeExtra > 0 && m === oneTimeMonth) extra += oneTimeExtra;
 
-      // prevent overpaying in last month
       let payment = basePI;
       let totalPrincipalThisMonth = principal + extra;
 
       if (totalPrincipalThisMonth > bal){
         totalPrincipalThisMonth = bal;
-        // adjust payment down so it equals interest + remaining balance
         payment = interest + (bal - (extra > bal ? 0 : Math.min(principal, bal)));
-        // we still show the "extra" as whatever was applied; clamp it
         extra = clamp(extra, 0, totalPrincipalThisMonth);
         principal = totalPrincipalThisMonth - extra;
       }
@@ -381,7 +403,7 @@
       rows.push({
         month: m,
         date,
-        payment: payment,
+        payment,
         principal,
         interest,
         extra,
@@ -390,7 +412,6 @@
       });
 
       m++;
-      // If rate is 0 and payment is 0, bail
       if (basePI <= 0 && extraMonthly <= 0) break;
     }
 
@@ -426,7 +447,6 @@
     return lines.join("\n");
   }
 
-  // ---------- render ----------
   function render(){
     const loan = Number($("loanAmount").value || 0);
     const rate = Number($("rate").value || 0);
@@ -434,48 +454,64 @@
     const extraMonthly = Number($("extraMonthly").value || 0);
     const oneTimeExtra = Number($("oneTimeExtra").value || 0);
     const oneTimeMonth = Math.max(1, Math.floor(Number($("oneTimeMonth").value || 1)));
+    const taxesYearly = Number($("taxesYearly").value || 0);
+    const insYearly = Number($("insYearly").value || 0);
+
+    const monthlyTaxes = taxesYearly / 12;
+    const monthlyIns = insYearly / 12;
 
     const startDateStr = $("startDate").value;
     const startDate = startDateStr ? new Date(startDateStr + "T00:00:00") : new Date();
 
-    // Standard scenario (no extras) for savings comparisons
     const standard = buildSchedule({
       loan, annualRate: rate, years,
       extraMonthly: 0, oneTimeExtra: 0, oneTimeMonth: 1,
       startDate
     });
 
-    // Current scenario
     const scenario = buildSchedule({
       loan, annualRate: rate, years,
       extraMonthly, oneTimeExtra, oneTimeMonth,
       startDate
     });
 
-    // KPIs
+    // KPI: P&I
     $("monthlyPI").textContent = fmtMoney2(scenario.basePI);
+
+    // KPI: all-in monthly (P&I + taxes + insurance + extraMonthly)
+    const allIn = scenario.basePI + monthlyTaxes + monthlyIns + extraMonthly;
+    $("monthlyAllIn").textContent = fmtMoney2(allIn);
+    $("monthlyAllInHint").textContent =
+      `P&I ${fmtMoney2(scenario.basePI)} + Taxes ${fmtMoney2(monthlyTaxes)} + Ins ${fmtMoney2(monthlyIns)} + Extra ${fmtMoney2(extraMonthly)}`;
+
+    // payoff + interest
     $("payoffTime").textContent = monthsToYearsMonths(scenario.payoffMonths);
     $("payoffDate").textContent = scenario.payoffDate ? `Estimated payoff: ${fmtDate(scenario.payoffDate)}` : "—";
     $("totalInterest").textContent = fmtMoney(scenario.totalInterest);
 
+    // taxes+ins total through payoff timeline
+    const totalTI = (monthlyTaxes + monthlyIns) * scenario.payoffMonths;
+    $("totalTI").textContent = fmtMoney(totalTI);
+    $("tiMonthly").textContent = `Monthly taxes+ins: ${fmtMoney2(monthlyTaxes + monthlyIns)}`;
+
+    // savings vs standard
     const interestSaved = standard.totalInterest - scenario.totalInterest;
     const timeSavedMonths = standard.payoffMonths - scenario.payoffMonths;
-
     $("interestSaved").textContent = (interestSaved >= 0 ? fmtMoney(interestSaved) : "—");
     $("timeSaved").textContent = timeSavedMonths > 0
       ? `Time saved: ${monthsToYearsMonths(timeSavedMonths)}`
       : `No time saved vs standard`;
 
-    // Bar (principal vs interest total)
-    const totalPaid = scenario.rows.reduce((s,r)=> s + r.payment + r.extra, 0);
-    const principalPaid = loan; // paid off to zero (assuming it finishes)
+    // Bar principal vs interest (loan only)
+    const totalPaidLoan = scenario.rows.reduce((s,r)=> s + r.payment + r.extra, 0);
+    const principalPaid = loan;
     const interestPaid = scenario.totalInterest;
-    const pPct = totalPaid > 0 ? (principalPaid / totalPaid) * 100 : 50;
-    const iPct = totalPaid > 0 ? (interestPaid / totalPaid) * 100 : 50;
+    const pPct = totalPaidLoan > 0 ? (principalPaid / totalPaidLoan) * 100 : 50;
+    const iPct = totalPaidLoan > 0 ? (interestPaid / totalPaidLoan) * 100 : 50;
     $("barPrincipal").style.width = `${clamp(pPct, 0, 100)}%`;
     $("barInterest").style.width  = `${clamp(iPct, 0, 100)}%`;
 
-    // Table rows
+    // Table
     const tbody = $("tbody");
     tbody.innerHTML = "";
     for (const r of scenario.rows){
@@ -494,11 +530,9 @@
     }
     $("rowCount").textContent = `${scenario.rows.length.toLocaleString()} payments shown`;
 
-    // Store for CSV download
     window.__currentRows = scenario.rows;
   }
 
-  // ---------- wiring ----------
   function setTodayIfEmpty(){
     if (!$("startDate").value){
       const d = new Date();
@@ -508,7 +542,6 @@
       $("startDate").value = `${yyyy}-${mm}-${dd}`;
     }
   }
-
   function setExtra(v){
     $("extraMonthly").value = v;
     $("oneTimeExtra").value = 0;
@@ -517,7 +550,7 @@
   }
 
   $("calcBtn").addEventListener("click", render);
-  ["purchasePrice","loanAmount","rate","years","extraMonthly","oneTimeExtra","oneTimeMonth","startDate"]
+  ["purchasePrice","loanAmount","rate","years","extraMonthly","oneTimeExtra","oneTimeMonth","startDate","taxesYearly","insYearly"]
     .forEach(id => $(id).addEventListener("input", () => render()));
 
   $("preset0").addEventListener("click", () => setExtra(0));
@@ -527,7 +560,24 @@
 
   $("downloadCsv").addEventListener("click", () => {
     const rows = window.__currentRows || [];
-    const csv = toCsv(rows);
+    const csv = (function(rows){
+      const header = ["Month","Date","Payment","Principal","Interest","Extra","Ending Balance","Total Interest To Date"];
+      const lines = [header.join(",")];
+      for (const r of rows){
+        lines.push([
+          r.month,
+          r.date.toISOString().slice(0,10),
+          r.payment.toFixed(2),
+          r.principal.toFixed(2),
+          r.interest.toFixed(2),
+          r.extra.toFixed(2),
+          r.balance.toFixed(2),
+          r.totalInterestToDate.toFixed(2)
+        ].join(","));
+      }
+      return lines.join("\n");
+    })(rows);
+
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -546,18 +596,16 @@
     $("themeLabel").textContent = next[0].toUpperCase() + next.slice(1);
   });
 
-  // Optional: if purchase price changes and loan amount equals old purchase price, keep them in sync
+  // Keep loan amount synced to purchase price when tracking
   let lastPurchase = Number($("purchasePrice").value || 0);
   $("purchasePrice").addEventListener("input", () => {
     const pp = Number($("purchasePrice").value || 0);
     const la = Number($("loanAmount").value || 0);
-    // If loan amount was tracking purchase price, continue tracking
     if (Math.abs(la - lastPurchase) < 1e-6) $("loanAmount").value = pp;
     lastPurchase = pp;
     render();
   });
 
-  // init
   setTodayIfEmpty();
   render();
 </script>
