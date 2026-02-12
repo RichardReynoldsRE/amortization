@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Amortization + Extra Payments</title>
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f1a2e; --panel2:#0c1628;
+      --text:#e7eefc; --muted:#a7b3cc; --line:#22314d;
+      --accent:#6ea8ff; --good:#4ade80; --bad:#fb7185; --warn:#fbbf24;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    [data-theme="light"]{
+      --bg:#f6f8fd; --panel:#ffffff; --panel2:#ffffff;
+      --text:#0b1220; --muted:#4b5a78; --line:#d8e0f0;
+      --accent:#2563eb; --good:#16a34a; --bad:#e11d48; --warn:#d97706;
+      --shadow: 0 10px 30px rgba(16,24,40,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--sans);
+      background: radial-gradient(1200px 800px at 10% 10%, rgba(110,168,255,.18), transparent 60%),
+                  radial-gradient(900px 600px at 90% 20%, rgba(74,222,128,.12), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:5;
+      backdrop-filter:saturate(140%) blur(10px);
+      background: color-mix(in oklab, var(--bg) 82%, transparent);
+      border-bottom:1px solid var(--line);
+    }
+    .wrap{max-width:1180px; margin:0 auto; padding:16px;}
+    .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center; justify-content:space-between;}
+    .title{
+      display:flex; gap:12px; align-items:center;
+    }
+    .badge{
+      font-family:var(--mono);
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid var(--line); background:color-mix(in oklab, var(--panel) 86%, transparent);
+      color:var(--muted);
+    }
+    h1{font-size:18px; margin:0}
+    .toggle{
+      display:flex; align-items:center; gap:10px;
+      padding:8px 12px; border:1px solid var(--line); border-radius:999px;
+      background:color-mix(in oklab, var(--panel) 92%, transparent);
+      box-shadow: var(--shadow);
+      cursor:pointer; user-select:none;
+    }
+    .toggle small{color:var(--muted)}
+    .grid{
+      display:grid; grid-template-columns: 1.05fr .95fr; gap:14px;
+      padding:16px;
+    }
+    @media (max-width:980px){ .grid{grid-template-columns:1fr; } }
+    .card{
+      background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 92%, transparent), color-mix(in oklab, var(--panel2) 92%, transparent));
+      border:1px solid var(--line); border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card h2{
+      font-size:14px; margin:0; padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      color: color-mix(in oklab, var(--text) 92%, var(--muted));
+      letter-spacing:.2px;
+    }
+    .content{padding:14px 16px;}
+    .inputs{
+      display:grid; grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    @media (max-width:640px){ .inputs{grid-template-columns:1fr;} }
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+    input, select{
+      width:100%; padding:11px 12px; border-radius:12px;
+      border:1px solid var(--line);
+      background: color-mix(in oklab, var(--panel) 92%, transparent);
+      color:var(--text);
+      outline:none;
+    }
+    input:focus, select:focus{border-color: color-mix(in oklab, var(--accent) 70%, var(--line))}
+    .hint{font-size:12px; color:var(--muted); margin-top:8px; line-height:1.35}
+    .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    button{
+      border:1px solid var(--line);
+      background: color-mix(in oklab, var(--panel) 90%, transparent);
+      color:var(--text);
+      padding:10px 12px; border-radius:12px;
+      cursor:pointer;
+    }
+    button:hover{border-color: color-mix(in oklab, var(--accent) 55%, var(--line))}
+    .primary{
+      background: color-mix(in oklab, var(--accent) 18%, var(--panel));
+      border-color: color-mix(in oklab, var(--accent) 65%, var(--line));
+    }
+    .ghost{background:transparent}
+    .kpis{
+      display:grid; grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:12px;
+    }
+    @media (max-width:640px){ .kpis{grid-template-columns:1fr;} }
+    .kpi{
+      padding:12px; border-radius:14px;
+      border:1px solid var(--line);
+      background: color-mix(in oklab, var(--panel) 92%, transparent);
+    }
+    .kpi .label{font-size:12px; color:var(--muted)}
+    .kpi .value{font-size:20px; font-weight:700; margin-top:6px}
+    .kpi .sub{font-size:12px; color:var(--muted); margin-top:4px}
+    .good{color:var(--good)}
+    .bad{color:var(--bad)}
+    .warn{color:var(--warn)}
+    .barwrap{
+      border:1px solid var(--line);
+      border-radius:14px; overflow:hidden;
+      background: color-mix(in oklab, var(--panel) 88%, transparent);
+      margin-top:12px;
+    }
+    .bar{
+      display:flex; height:16px; width:100%;
+    }
+    .bar > div{height:100%}
+    .legend{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:12px}
+    .dot{width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px; vertical-align:middle}
+    .tablewrap{
+      max-height:520px; overflow:auto; border-radius:14px;
+      border:1px solid var(--line);
+      background: color-mix(in oklab, var(--panel) 92%, transparent);
+    }
+    table{width:100%; border-collapse:collapse; font-size:12px}
+    thead th{
+      position:sticky; top:0; z-index:2;
+      background: color-mix(in oklab, var(--panel) 96%, var(--bg));
+      color:var(--muted);
+      text-align:right; padding:10px 10px; border-bottom:1px solid var(--line);
+      white-space:nowrap;
+    }
+    thead th:first-child, tbody td:first-child{text-align:left}
+    tbody td{
+      padding:8px 10px; border-bottom:1px solid color-mix(in oklab, var(--line) 65%, transparent);
+      text-align:right; white-space:nowrap;
+    }
+    tbody tr:hover{background: color-mix(in oklab, var(--accent) 10%, transparent)}
+    .footer-note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.35}
+    .smallrow{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
+  </style>
+</head>
+
+<body data-theme="dark">
+  <header>
+    <div class="wrap">
+      <div class="row">
+        <div class="title">
+          <h1>Mortgage Amortization + Extra Payments</h1>
+          <span class="badge" id="versionBadge">Single-file calculator</span>
+        </div>
+        <div class="toggle" id="themeToggle" role="button" aria-label="Toggle theme">
+          <small>Theme</small>
+          <strong id="themeLabel">Dark</strong>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <!-- Inputs -->
+      <section class="card">
+        <h2>Inputs</h2>
+        <div class="content">
+          <div class="inputs">
+            <div>
+              <label>Purchase price (optional)</label>
+              <input id="purchasePrice" type="number" min="0" step="100" value="360000">
+            </div>
+            <div>
+              <label>Loan amount</label>
+              <input id="loanAmount" type="number" min="0" step="100" value="360000">
+            </div>
+            <div>
+              <label>Interest rate (APR %)</label>
+              <input id="rate" type="number" min="0" step="0.01" value="6.11">
+            </div>
+            <div>
+              <label>Term (years)</label>
+              <input id="years" type="number" min="1" step="1" value="30">
+            </div>
+
+            <div>
+              <label>Extra payment (monthly)</label>
+              <input id="extraMonthly" type="number" min="0" step="10" value="0">
+            </div>
+            <div>
+              <label>One-time extra payment</label>
+              <input id="oneTimeExtra" type="number" min="0" step="100" value="0">
+            </div>
+
+            <div>
+              <label>One-time extra month #</label>
+              <input id="oneTimeMonth" type="number" min="1" step="1" value="1">
+            </div>
+            <div>
+              <label>Start date</label>
+              <input id="startDate" type="date">
+            </div>
+          </div>
+
+          <div class="btns">
+            <button class="primary" id="calcBtn">Recalculate</button>
+            <button id="preset0">$0 extra</button>
+            <button id="preset100">+$100/mo</button>
+            <button id="preset200">+$200/mo</button>
+            <button id="preset500">+$500/mo</button>
+            <button class="ghost" id="downloadCsv">Download CSV</button>
+          </div>
+
+          <div class="hint">
+            Tip: Keep “Loan amount” at the actual financed amount. If you only know purchase price,
+            set loan amount = purchase price for a clean demo.
+          </div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section class="card">
+        <h2>Results</h2>
+        <div class="content">
+          <div class="kpis">
+            <div class="kpi">
+              <div class="label">Monthly payment (P&I)</div>
+              <div class="value" id="monthlyPI">$—</div>
+              <div class="sub" id="monthlyPIHint">Excludes taxes/insurance</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Payoff time</div>
+              <div class="value" id="payoffTime">—</div>
+              <div class="sub" id="payoffDate">—</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Total interest</div>
+              <div class="value" id="totalInterest">$—</div>
+              <div class="sub">Across this scenario</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Interest saved vs. standard</div>
+              <div class="value good" id="interestSaved">$—</div>
+              <div class="sub" id="timeSaved">—</div>
+            </div>
+          </div>
+
+          <div class="barwrap" aria-label="Principal vs Interest bar">
+            <div class="bar">
+              <div id="barPrincipal" style="background:color-mix(in oklab, var(--good) 65%, transparent); width:50%"></div>
+              <div id="barInterest"  style="background:color-mix(in oklab, var(--bad) 65%, transparent); width:50%"></div>
+            </div>
+          </div>
+          <div class="legend">
+            <span><span class="dot" style="background:color-mix(in oklab, var(--good) 65%, transparent)"></span>Principal</span>
+            <span><span class="dot" style="background:color-mix(in oklab, var(--bad) 65%, transparent)"></span>Interest</span>
+          </div>
+
+          <div class="footer-note" id="note">
+            This schedule assumes a fixed rate and that extra payments go directly to principal.
+          </div>
+        </div>
+      </section>
+
+      <!-- Table -->
+      <section class="card" style="grid-column:1 / -1;">
+        <h2>Amortization Schedule</h2>
+        <div class="content">
+          <div class="smallrow">
+            <div class="hint" style="margin:0">
+              Showing full schedule (scroll). Columns: payment, principal, interest, extra, ending balance.
+            </div>
+            <div class="hint" style="margin:0; font-family:var(--mono)" id="rowCount">—</div>
+          </div>
+
+          <div class="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Date</th>
+                  <th>Payment</th>
+                  <th>Principal</th>
+                  <th>Interest</th>
+                  <th>Extra</th>
+                  <th>Ending Balance</th>
+                  <th>Total Interest (To Date)</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+<script>
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+
+  function fmtMoney(n){
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:0 });
+  }
+  function fmtMoney2(n){
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString(undefined, { style:"currency", currency:"USD", maximumFractionDigits:2 });
+  }
+  function clamp(n, min, max){ return Math.min(max, Math.max(min, n)); }
+
+  function addMonths(date, months){
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    // handle month-end rollovers
+    if (d.getDate() < day) d.setDate(0);
+    return d;
+  }
+  function fmtDate(d){
+    if (!(d instanceof Date) || isNaN(d)) return "—";
+    return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
+  }
+
+  // Payment formula: P = L * r / (1 - (1+r)^-n)
+  function monthlyPayment(loan, annualRate, months){
+    const r = (annualRate/100)/12;
+    if (r === 0) return loan / months;
+    return loan * (r / (1 - Math.pow(1+r, -months)));
+  }
+
+  // Build schedule with optional extra monthly and one-time extra
+  function buildSchedule({loan, annualRate, years, extraMonthly, oneTimeExtra, oneTimeMonth, startDate}){
+    const n = Math.round(years * 12);
+    const r = (annualRate/100)/12;
+    const basePI = monthlyPayment(loan, annualRate, n);
+
+    let bal = loan;
+    let totalInterest = 0;
+    let rows = [];
+    let m = 1;
+
+    // cap loop to prevent infinite in weird edge cases
+    const maxMonths = 1200;
+
+    while (bal > 0.01 && m <= maxMonths){
+      const interest = r === 0 ? 0 : bal * r;
+      let principal = basePI - interest;
+      if (principal < 0) principal = 0;
+
+      let extra = extraMonthly || 0;
+      if (oneTimeExtra > 0 && m === oneTimeMonth) extra += oneTimeExtra;
+
+      // prevent overpaying in last month
+      let payment = basePI;
+      let totalPrincipalThisMonth = principal + extra;
+
+      if (totalPrincipalThisMonth > bal){
+        totalPrincipalThisMonth = bal;
+        // adjust payment down so it equals interest + remaining balance
+        payment = interest + (bal - (extra > bal ? 0 : Math.min(principal, bal)));
+        // we still show the "extra" as whatever was applied; clamp it
+        extra = clamp(extra, 0, totalPrincipalThisMonth);
+        principal = totalPrincipalThisMonth - extra;
+      }
+
+      bal = bal - totalPrincipalThisMonth;
+      totalInterest += interest;
+
+      const date = addMonths(startDate, m-1);
+      rows.push({
+        month: m,
+        date,
+        payment: payment,
+        principal,
+        interest,
+        extra,
+        balance: Math.max(0, bal),
+        totalInterestToDate: totalInterest
+      });
+
+      m++;
+      // If rate is 0 and payment is 0, bail
+      if (basePI <= 0 && extraMonthly <= 0) break;
+    }
+
+    const payoffMonths = rows.length;
+    const payoffDate = payoffMonths ? addMonths(startDate, payoffMonths-1) : null;
+
+    return { basePI, rows, payoffMonths, payoffDate, totalInterest };
+  }
+
+  function monthsToYearsMonths(totalMonths){
+    const yrs = Math.floor(totalMonths / 12);
+    const mos = totalMonths % 12;
+    if (yrs <= 0) return `${mos} mo`;
+    if (mos === 0) return `${yrs} yrs`;
+    return `${yrs} yrs ${mos} mo`;
+  }
+
+  function toCsv(rows){
+    const header = ["Month","Date","Payment","Principal","Interest","Extra","Ending Balance","Total Interest To Date"];
+    const lines = [header.join(",")];
+    for (const r of rows){
+      lines.push([
+        r.month,
+        r.date.toISOString().slice(0,10),
+        r.payment.toFixed(2),
+        r.principal.toFixed(2),
+        r.interest.toFixed(2),
+        r.extra.toFixed(2),
+        r.balance.toFixed(2),
+        r.totalInterestToDate.toFixed(2)
+      ].join(","));
+    }
+    return lines.join("\n");
+  }
+
+  // ---------- render ----------
+  function render(){
+    const loan = Number($("loanAmount").value || 0);
+    const rate = Number($("rate").value || 0);
+    const years = Number($("years").value || 30);
+    const extraMonthly = Number($("extraMonthly").value || 0);
+    const oneTimeExtra = Number($("oneTimeExtra").value || 0);
+    const oneTimeMonth = Math.max(1, Math.floor(Number($("oneTimeMonth").value || 1)));
+
+    const startDateStr = $("startDate").value;
+    const startDate = startDateStr ? new Date(startDateStr + "T00:00:00") : new Date();
+
+    // Standard scenario (no extras) for savings comparisons
+    const standard = buildSchedule({
+      loan, annualRate: rate, years,
+      extraMonthly: 0, oneTimeExtra: 0, oneTimeMonth: 1,
+      startDate
+    });
+
+    // Current scenario
+    const scenario = buildSchedule({
+      loan, annualRate: rate, years,
+      extraMonthly, oneTimeExtra, oneTimeMonth,
+      startDate
+    });
+
+    // KPIs
+    $("monthlyPI").textContent = fmtMoney2(scenario.basePI);
+    $("payoffTime").textContent = monthsToYearsMonths(scenario.payoffMonths);
+    $("payoffDate").textContent = scenario.payoffDate ? `Estimated payoff: ${fmtDate(scenario.payoffDate)}` : "—";
+    $("totalInterest").textContent = fmtMoney(scenario.totalInterest);
+
+    const interestSaved = standard.totalInterest - scenario.totalInterest;
+    const timeSavedMonths = standard.payoffMonths - scenario.payoffMonths;
+
+    $("interestSaved").textContent = (interestSaved >= 0 ? fmtMoney(interestSaved) : "—");
+    $("timeSaved").textContent = timeSavedMonths > 0
+      ? `Time saved: ${monthsToYearsMonths(timeSavedMonths)}`
+      : `No time saved vs standard`;
+
+    // Bar (principal vs interest total)
+    const totalPaid = scenario.rows.reduce((s,r)=> s + r.payment + r.extra, 0);
+    const principalPaid = loan; // paid off to zero (assuming it finishes)
+    const interestPaid = scenario.totalInterest;
+    const pPct = totalPaid > 0 ? (principalPaid / totalPaid) * 100 : 50;
+    const iPct = totalPaid > 0 ? (interestPaid / totalPaid) * 100 : 50;
+    $("barPrincipal").style.width = `${clamp(pPct, 0, 100)}%`;
+    $("barInterest").style.width  = `${clamp(iPct, 0, 100)}%`;
+
+    // Table rows
+    const tbody = $("tbody");
+    tbody.innerHTML = "";
+    for (const r of scenario.rows){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.month}</td>
+        <td>${fmtDate(r.date)}</td>
+        <td>${fmtMoney2(r.payment)}</td>
+        <td>${fmtMoney2(r.principal)}</td>
+        <td>${fmtMoney2(r.interest)}</td>
+        <td>${fmtMoney2(r.extra)}</td>
+        <td>${fmtMoney2(r.balance)}</td>
+        <td>${fmtMoney2(r.totalInterestToDate)}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    $("rowCount").textContent = `${scenario.rows.length.toLocaleString()} payments shown`;
+
+    // Store for CSV download
+    window.__currentRows = scenario.rows;
+  }
+
+  // ---------- wiring ----------
+  function setTodayIfEmpty(){
+    if (!$("startDate").value){
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      $("startDate").value = `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  function setExtra(v){
+    $("extraMonthly").value = v;
+    $("oneTimeExtra").value = 0;
+    $("oneTimeMonth").value = 1;
+    render();
+  }
+
+  $("calcBtn").addEventListener("click", render);
+  ["purchasePrice","loanAmount","rate","years","extraMonthly","oneTimeExtra","oneTimeMonth","startDate"]
+    .forEach(id => $(id).addEventListener("input", () => render()));
+
+  $("preset0").addEventListener("click", () => setExtra(0));
+  $("preset100").addEventListener("click", () => setExtra(100));
+  $("preset200").addEventListener("click", () => setExtra(200));
+  $("preset500").addEventListener("click", () => setExtra(500));
+
+  $("downloadCsv").addEventListener("click", () => {
+    const rows = window.__currentRows || [];
+    const csv = toCsv(rows);
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "amortization_schedule.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  $("themeToggle").addEventListener("click", () => {
+    const body = document.body;
+    const next = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    body.setAttribute("data-theme", next);
+    $("themeLabel").textContent = next[0].toUpperCase() + next.slice(1);
+  });
+
+  // Optional: if purchase price changes and loan amount equals old purchase price, keep them in sync
+  let lastPurchase = Number($("purchasePrice").value || 0);
+  $("purchasePrice").addEventListener("input", () => {
+    const pp = Number($("purchasePrice").value || 0);
+    const la = Number($("loanAmount").value || 0);
+    // If loan amount was tracking purchase price, continue tracking
+    if (Math.abs(la - lastPurchase) < 1e-6) $("loanAmount").value = pp;
+    lastPurchase = pp;
+    render();
+  });
+
+  // init
+  setTodayIfEmpty();
+  render();
+</script>
+</body>
+</html>
